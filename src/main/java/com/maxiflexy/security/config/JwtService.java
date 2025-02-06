@@ -4,6 +4,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import io.jsonwebtoken.Claims;
@@ -17,25 +18,42 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    private static final String SECRET_KET = "aIwgXPoi/M+eUWkwibeZPykjQoHDvvSphiSsP0lEaBMuallpQd+rFbNk6fo2MNS8K+LaFEzy46ch6+0zVnXulX+LgJ3LVxtyx+3NGczvmbtbwI4KKhmHmdnJO5vmLgPAcoAT925213sagbBzDa1EtPT9HVd7VirlJaDNOcDKb3AtJ98AX4xBIltnzIBrTan9e1Qbs04byDGZ8sBbKDDiJXVW5WkjHDyKEpFbXyRUeL7DE8ME4XH82CKAwNSk8lYyYd7D3lBZwusyBXnuqQEtxPx/or9ir934Gs14BJhVjCA7p5B0c3Yl1KIXolR0pOOpZPNUhHQX5hX4hnrojwhDBEt6NGcnp6JEab4r/cGTHd0=";
+    @Value("${app.security.jwt.secret_key}")
+    private String secretKey;
+
+    @Value("${app.security.jwt.expiration}")
+    private long jwtExpiration;
+
+    @Value("${app.security.jwt.refresh-token.expiration}")
+    private long refreshJwtExpiration;
 
 
     public String extractUsername(String token) {
         return extractClaims(token, Claims::getSubject);
     }
 
+    public String generateToken(UserDetails userDetails){
+        return generateToken(new HashMap<>(), userDetails);
+    }
+
     public String generateToken(Map<String, Object> extractClaims, UserDetails userDetails){
+        return buildToken(extractClaims, userDetails, jwtExpiration);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails){
+        return buildToken(new HashMap<>(), userDetails, refreshJwtExpiration);
+    }
+
+    private String buildToken(Map<String, Object> extractClaims, UserDetails userDetails, long expiration){
+
         return Jwts.builder()
                 .setClaims(extractClaims)
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 24))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
-    }
 
-    public String generateToken(UserDetails userDetails){
-        return generateToken(new HashMap<>(), userDetails);
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails){
@@ -65,7 +83,7 @@ public class JwtService {
     }
 
     private Key getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KET);
+        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }
